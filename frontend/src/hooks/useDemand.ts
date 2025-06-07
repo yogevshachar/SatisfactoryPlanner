@@ -10,7 +10,7 @@ export const useDemand = (params: DemandParams, enabled: boolean = true) => {
   return useQuery<DemandEntry[]>({
     queryKey: ["demand", params],
     queryFn: async () => {
-      const res = await axios.post("http://satisfactoryplanner.onrender.com/planner/demand", params);
+      const res = await axios.post("https://satisfactoryplanner.onrender.com/planner/demand", params);
 
       return res.data;
     },
