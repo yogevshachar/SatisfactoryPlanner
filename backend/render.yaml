@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: factory-backend
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://yogevshachar9:54fDoFU772WW0doA@satisfactoryroadmap.napgy91.mongodb.net/
