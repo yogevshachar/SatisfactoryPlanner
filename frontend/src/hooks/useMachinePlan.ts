@@ -18,7 +18,7 @@ export const useMachinePlan = (params: MachinePlanParams, enabled: boolean = tru
   return useQuery<MachinePlanEntry[]>({
     queryKey: ["machine-plan", params],
     queryFn: async () => {
-      const res = await axios.post("http://localhost:8081/planner/machine_plan", params);
+      const res = await axios.post("http://satisfactoryplanner.onrender.com/planner/machine_plan", params);
       return res.data;
     },
     enabled

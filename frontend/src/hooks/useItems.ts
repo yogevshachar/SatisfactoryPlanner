@@ -9,7 +9,7 @@ export const useItems = () => {
   return useQuery<Item[]>({
     queryKey: ["items"],
     queryFn: async () => {
-      const res = await axios.get<Item[]>("http://localhost:8081/items");
+      const res = await axios.get<Item[]>("http://satisfactoryplanner.onrender.com/items");
       return res.data;
     },
   });
