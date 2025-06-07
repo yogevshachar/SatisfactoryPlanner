@@ -5,11 +5,6 @@ import PlannerForm from "../components/PlannerForm";
 import type {PlannerPayload} from "../types/factory.types";
 import PlannerTabs from "../components/PlannerTabs.tsx";
 
-type Target = {
-    item: string;
-    rate: number;
-};
-
 const PlannerPage: React.FC = () => {
     const {data: items = []} = useItems();
 
