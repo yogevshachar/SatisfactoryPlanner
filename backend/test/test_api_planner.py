@@ -8,7 +8,7 @@ def test_calculate_demand_for_smart_plating():
     )
 
     # Check core expectations
-    print(result)
+
     assert isinstance(result, dict)
     assert result["screw"] == 74
     assert result["iron_ingot"] == 46.5

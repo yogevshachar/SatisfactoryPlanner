@@ -20,12 +20,10 @@ class FactoryPlanner:
             recipe = await self.recipe_repo.get_recipe_by_output(item)
             if not recipe:
                 return
-            output_amount = recipe.outputs[0].amount
-            rate_per_min = output_amount / recipe.duration * 60
-            recipe_rate = output_amount * rate_per_min
+            recipe_rate = recipe.outputs[0].rate_per_min
             multiplier = rate / recipe_rate
             for ing in recipe.inputs:
-                ing_rate = round(ing.amount * multiplier * rate_per_min, 2)
+                ing_rate = round(ing.rate_per_min * multiplier, 2)
                 await add_demand(ing.item, ing_rate)
 
         for t in targets:
@@ -41,8 +39,7 @@ class FactoryPlanner:
             recipe = await self.recipe_repo.get_recipe_by_output(item)
             if not recipe:
                 continue
-            primary_output = recipe.outputs[0]
-            per_min_output = primary_output.amount / recipe.duration * 60
+            per_min_output = recipe.outputs[0].rate_per_min
             machines_needed = total_rate / per_min_output
 
             machine_plan.append({
@@ -68,17 +65,11 @@ class FactoryPlanner:
             item_to_node[item] = node_id
 
             recipe = await self.recipe_repo.get_recipe_by_output(item)
-            if recipe is None:
-                nodes.append(Node(
-                    id=node_id,
-                    label=f"{item} (Raw)",
-                    type=NodeType.RESOURCE,
-                    item=item
-                ))
+            if not recipe:
                 return node_id
             primary_output = recipe.outputs[0]
 
-            per_min_output = primary_output.amount / recipe.duration * 60
+            per_min_output = primary_output.rate_per_min
             count = demand[item] / per_min_output
             node = Node(
                 id=node_id,
@@ -93,7 +84,7 @@ class FactoryPlanner:
 
             for ing in recipe.inputs:
                 source_id = item_to_node.get(ing.item) or await create_node(ing.item)
-                ing_rate = ing.amount / recipe.duration * 60
+                ing_rate = ing.rate_per_min
                 edges.append(Edge(
                     source=source_id,
                     target=node_id,
@@ -163,7 +154,7 @@ class FactoryPlanner:
             supply_map[node.id][node.item] += node.rate
 
             for ing in recipe.inputs:
-                required_rate = (ing.amount * 60 / recipe.duration) * node.count
+                required_rate = ing.rate_per_min * node.count
                 demand_map[node.id][ing.item] += required_rate
 
         # Step 3: Match supply to demand per item

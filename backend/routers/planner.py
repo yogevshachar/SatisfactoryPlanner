@@ -54,7 +54,5 @@ async def plan_factory(
     planner = FactoryPlanner(item_repo, recipe_repo, machine_repo)
     graph = await planner.build_simplify_graph(req.targets)
     if req.realistic:
-
         graph = await planner.build_realistic_graph(graph)
-        print(graph)
     return graph

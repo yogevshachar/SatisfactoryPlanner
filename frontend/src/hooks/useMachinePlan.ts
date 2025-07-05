@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import type {PlannerTarget} from "../types/factory.types.ts";
+import { API_ENDPOINTS } from "../config/api";
 
 type MachinePlanEntry = {
   item: string;
@@ -18,7 +19,7 @@ export const useMachinePlan = (params: MachinePlanParams, enabled: boolean = tru
   return useQuery<MachinePlanEntry[]>({
     queryKey: ["machine-plan", params],
     queryFn: async () => {
-      const res = await axios.post("https://satisfactoryplanner.onrender.com/planner/machine_plan", params);
+      const res = await axios.post(API_ENDPOINTS.PLANNER_MACHINE_PLAN, params);
       return res.data;
     },
     enabled

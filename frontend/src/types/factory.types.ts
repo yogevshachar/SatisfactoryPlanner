@@ -17,19 +17,31 @@ export type DemandEntry = {
     item: string;
     rate: number;
 };
-export type GraphNode = {
+export type MachineNode = {
     id: string;
     label: string;
-    type: "machine" | "resource" | "splitter" | "merger";
+    type: "machine" | "splitter" | "merger";
     item: string;
-    machine?: string;
-    count?: number;
+    rate: number;
+    machine: string;
+    count: number;
 };
+
+export type ResourceNode = {
+    id: string;
+    label: string;
+    type: "resource";
+    item: string;
+};
+
+export type GraphNode = MachineNode | ResourceNode;
 
 export type GraphEdge = {
     source: string;
     target: string;
     label?: string;
+    rate?: number;
+    item?: string;
 };
 
 export type FactoryGraph = {

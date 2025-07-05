@@ -6,10 +6,9 @@ from models.base import GameEntityBase
 
 class IOEntry(BaseModel):
     item: str
-    amount: float
+    rate_per_min: float
 
 class Recipe(GameEntityBase):
     inputs: List[IOEntry]
     outputs: List[IOEntry]
-    duration: float
     machine: str

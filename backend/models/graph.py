@@ -1,7 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, Union
 
 
 class NodeType(str, Enum):
@@ -15,10 +15,19 @@ class Node(BaseModel):
     id: str
     label: str
     type: NodeType
-    rate: Optional[float]=0
-    item: Optional[str] = None
-    machine: Optional[str] = None
-    count: Optional[float] = None  # machine count or underclock factor
+    rate: float
+    item: str
+    machine: str
+    count: float  # machine count or underclock factor
+
+class RawNode(BaseModel):
+    id: str
+    label: str
+    item: str
+    type: NodeType
+
+GraphNode = Union[Node, RawNode]
+    
 
 class Edge(BaseModel):
     source: str

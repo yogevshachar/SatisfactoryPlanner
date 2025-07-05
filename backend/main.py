@@ -10,8 +10,8 @@ from dal.mongo import MongoItemRepository, MongoRecipeRepository, MongoMachineRe
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client = AsyncIOMotorClient(os.environ["MONGO_URI"])
-    db = client['SatisfactoryDB']
+    client = AsyncIOMotorClient(os.environ.get("MONGO_URI", "mongodb://localhost:27017"))
+    db = client['satisfactory']
 
     # Initialize repositories and store in app state
     app.state.item_repo = MongoItemRepository(db)

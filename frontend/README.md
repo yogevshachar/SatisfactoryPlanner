@@ -1,4 +1,36 @@
-# React + TypeScript + Vite
+# Satisfactory Builder Frontend
+
+This is the frontend application for the Satisfactory Builder project, built with React + TypeScript + Vite.
+
+## API Configuration
+
+The application uses environment variables to configure the API endpoint. By default, it connects to `http://localhost:8081`.
+
+### Environment Variables
+
+Create a `.env` file in the frontend directory with the following variable:
+
+```env
+# API Configuration
+# Set this to your backend API URL (defaults to http://localhost:8081 if not set)
+VITE_API_BASE_URL=http://localhost:8081
+
+# Example for production:
+# VITE_API_BASE_URL=https://your-api-domain.com
+
+# Example for different development environment:
+# VITE_API_BASE_URL=http://localhost:3000
+```
+
+### Available Endpoints
+
+The following API endpoints are configured:
+- `ITEMS`: `/items` - Get all available items
+- `PLANNER_DEMAND`: `/planner/demand` - Calculate demand for items
+- `PLANNER_MACHINE_PLAN`: `/planner/machine_plan` - Generate machine plan
+- `PLANNER_REUSE`: `/planner/reuse` - Reuse planner functionality
+
+## Development
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

@@ -1,5 +1,5 @@
 import dagre from "dagre";
-import  {type Node,type Edge, Position } from "reactflow";
+import { type Node, type Edge, Position } from "reactflow";
 
 const nodeWidth = 180;
 const nodeHeight = 60;
