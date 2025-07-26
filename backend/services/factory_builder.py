@@ -1,18 +1,24 @@
 from collections import defaultdict
 from typing import List
 
+from services.shard_allocator import ShardAllocator, ShardStrategy
 from dal.base import RecipeRepository, ItemRepository, MachineRepository
-from models.graph import NodeType, Node, Edge
-from models.planner import FactoryGraph
+from models.graph import InnerNode, NodeType, Node, Edge
+from models.machine import CostEntry
 
 
 class FactoryPlanner:
-    def __init__(self, item_repo: ItemRepository, recipe_repo: RecipeRepository, machine_repo: MachineRepository):
+    def __init__(
+        self,
+        item_repo: ItemRepository,
+        recipe_repo: RecipeRepository,
+        machine_repo: MachineRepository,
+    ):
         self.item_repo = item_repo
         self.recipe_repo = recipe_repo
         self.machine_repo = machine_repo
 
-    async def compute_total_demand(self, targets):
+    async def planProduction(self, targets):
         demand = defaultdict(float)
 
         async def add_demand(item, rate):
@@ -32,7 +38,7 @@ class FactoryPlanner:
         return dict(demand)
 
     async def compute_machine_plan(self, targets):
-        demand = await self.compute_total_demand(targets)
+        demand = await self.planProduction(targets)
         machine_plan = []
 
         for item, total_rate in demand.items():
@@ -42,157 +48,146 @@ class FactoryPlanner:
             per_min_output = recipe.outputs[0].rate_per_min
             machines_needed = total_rate / per_min_output
 
-            machine_plan.append({
-                "item": item,
-                "machine": recipe.machine,
-                "count": round(machines_needed, 2),
-                "rate": round(total_rate, 2)
-            })
+            machine_plan.append(
+                {
+                    "item": item,
+                    "machine": recipe.machine,
+                    "count": round(machines_needed, 2),
+                    "rate": round(total_rate, 2),
+                }
+            )
 
         return machine_plan
 
-    async def build_simplify_graph(self, targets):
-        demand = await self.compute_total_demand(targets)
-        nodes = []
-        edges = []
-        id_counter = 0
-        item_to_node = {}
-
-        async def create_node(item: str) -> str:
-            nonlocal id_counter
-            node_id = f"node_{id_counter}"
-            id_counter += 1
-            item_to_node[item] = node_id
-
+    async def generate_detailed_machine_nodes(
+        self,
+        demand,
+        power_shards: int = 0,
+        shard_strategy: ShardStrategy = ShardStrategy.MACHINE_MINIMIZING,
+    ) -> List[InnerNode]:
+        shard_allocator = ShardAllocator(shard_strategy)
+        machine_nodes = []
+        for item, rate in demand.items():
             recipe = await self.recipe_repo.get_recipe_by_output(item)
             if not recipe:
-                return node_id
-            primary_output = recipe.outputs[0]
-
-            per_min_output = primary_output.rate_per_min
-            count = demand[item] / per_min_output
-            node = Node(
-                id=node_id,
-                label=f"{recipe.machine} ({item})\n{count:.2f}x",
-                type=NodeType.MACHINE,
-                item=item,
-                rate=per_min_output * count,
-                machine=recipe.machine,
-                count=count
-            )
-            nodes.append(node)
-
-            for ing in recipe.inputs:
-                source_id = item_to_node.get(ing.item) or await create_node(ing.item)
-                ing_rate = ing.rate_per_min
-                edges.append(Edge(
-                    source=source_id,
-                    target=node_id,
-                    label=f"{count * ing_rate:.2f}/min"
-                ))
-
-            return node_id
-
-        for item in demand:
-            if item not in item_to_node:
-                await create_node(item)
-
-        return FactoryGraph(nodes=nodes, edges=edges)
-
-    @staticmethod
-    def expend_nodes(nodes: List[Node]) -> List[Node]:
-        expanded_nodes = []
-        for node in nodes:
-            if node.type != NodeType.MACHINE:
-                expanded_nodes.append(node)
                 continue
-            recipe_rate = node.rate / node.count
-            full_units = int(node.count)
-            partial = node.count - full_units
-
-            for i in range(full_units):
-                new_id = f"{node.id}_unit_{i + 1}"
-                new_node = Node(
-                    **node.model_dump(exclude={'id', 'label', 'count', 'rate'}),
-                    rate=recipe_rate,
-                    id=new_id,
-                    label=f"{node.machine} ({node.item}) #{i + 1}\n1.00x",
-                    count=1.0
+            number_of_machines = rate / recipe.outputs[0].rate_per_min
+            for i in range(int(number_of_machines)):
+                machine_node = InnerNode(
+                    id=f"{recipe.machine}_{item}_{i}",
+                    type=NodeType.MACHINE,
+                    inputs={ing.item: ing.rate_per_min for ing in recipe.inputs},
+                    outputs={out.item: out.rate_per_min for out in recipe.outputs},
+                    primary_output=recipe.outputs[0].item,
+                    machine=recipe.machine,
+                    count=1.0,
                 )
-                expanded_nodes.append(new_node)
-
-            if partial > 0:
-                new_id = f"{node.id}_unit_{full_units + 1}"
-                new_node = Node(
-                    **node.model_dump(exclude={'id', 'label', 'count', 'rate'}),
-                    rate=recipe_rate * partial,
-                    id=new_id,
-                    label=f"{node.machine} ({node.item}) #{full_units + 1}\n{partial:.2f}x",
-                    count=partial
+                machine_nodes.append(machine_node)
+            multiplier = number_of_machines % 1
+            if multiplier != 0:
+                inputs = {
+                    ing.item: ing.rate_per_min * multiplier for ing in recipe.inputs
+                }
+                outputs = {
+                    out.item: out.rate_per_min * multiplier for out in recipe.outputs
+                }
+                machine_node = InnerNode(
+                    id=f"{recipe.machine}_{item}_{number_of_machines}",
+                    type=NodeType.MACHINE,
+                    inputs=inputs,
+                    outputs=outputs,
+                    primary_output=recipe.outputs[0].item,
+                    machine=recipe.machine,
+                    count=multiplier,
                 )
-                expanded_nodes.append(new_node)
-        return expanded_nodes
+                machine_nodes.append(machine_node)
 
-    async def build_realistic_graph(self, graph: FactoryGraph):
+        return shard_allocator.allocate(machine_nodes, power_shards)
 
-        expanded_edges = []
-        supply_map = defaultdict(lambda: defaultdict(float))
-        demand_map = defaultdict(lambda: defaultdict(float))
-
-        # Step 1: Expand machine clusters into individual nodes
-        expanded_nodes = self.expend_nodes(graph.nodes)
-
-        # Step 2: Build supply and demand maps
-        for node in expanded_nodes:
-            if node.type != NodeType.MACHINE:
-                continue
-
-            recipe = await self.recipe_repo.get_recipe_by_output(node.item)
+    async def generate_simple_machine_nodes(self, demand) -> List[InnerNode]:
+        machine_nodes = []
+        for item, rate in demand.items():
+            recipe = await self.recipe_repo.get_recipe_by_output(item)
             if not recipe:
                 continue
+            number_of_machines = rate / recipe.outputs[0].rate_per_min
+            inputs = {
+                ing.item: ing.rate_per_min * number_of_machines for ing in recipe.inputs
+            }
+            outputs = {
+                out.item: out.rate_per_min * number_of_machines
+                for out in recipe.outputs
+            }
+            machine_nodes.append(
+                InnerNode(
+                    id=f"{recipe.machine}_{item}",
+                    type=NodeType.MACHINE,
+                    inputs=inputs,
+                    outputs=outputs,
+                    primary_output=recipe.outputs[0].item,
+                    machine=recipe.machine,
+                    count=number_of_machines,
+                )
+            )
+        return machine_nodes
 
-            supply_map[node.id][node.item] += node.rate
+    async def connect_nodes(self, nodes: List[InnerNode]) -> List[Edge]:
+        usage = defaultdict(float)
+        edges = []
+        for node in nodes:
+            if node.type != NodeType.MACHINE:
+                continue
 
-            for ing in recipe.inputs:
-                required_rate = ing.rate_per_min * node.count
-                demand_map[node.id][ing.item] += required_rate
-
-        # Step 3: Match supply to demand per item
-        items = set()
-        for node_rates in supply_map.values():
-            items.update(node_rates.keys())
-        for node_rates in demand_map.values():
-            items.update(node_rates.keys())
-
-        for item in items:
-            # Nodes that can produce the item
-            producers = [(nid, supply_map[nid][item]) for nid in supply_map if item in supply_map[nid]]
-            # Nodes that need the item
-            consumers = [(nid, demand_map[nid][item]) for nid in demand_map if item in demand_map[nid]]
-
-            for consumer_id, needed in consumers:
-                for producer_idx in range(len(producers)):
-                    producer_id, available = producers[producer_idx]
-
-                    if needed <= 0:
+            for ing, rate in node.inputs.items():
+                matching_nodes = [n for n in nodes if ing in n.outputs.keys()]
+                if not matching_nodes:
+                    continue
+                for n in matching_nodes:
+                    if usage[n.id] == n.outputs[ing]:
+                        continue
+                    edge_rate = min(rate, n.outputs[ing] - usage[n.id])
+                    rate -= edge_rate
+                    usage[n.id] += edge_rate
+                    edges.append(
+                        Edge(
+                            source=n.id,
+                            target=node.id,
+                            label=f"{ing}: {edge_rate:.2f}/min",
+                        )
+                    )
+                    if rate == 0:
                         break
-                    if available <= 0:
-                        continue
+        return edges
 
-                    flow = min(needed, available)
-                    if flow <= 0:
-                        continue
+    async def compute_factory_cost(self, targets):
+        cost = defaultdict(float)
+        machine_plan = await self.compute_machine_plan(targets)
+        for machine_plan_entry in machine_plan:
+            machine = await self.machine_repo.get_machine_by_id(
+                machine_plan_entry["machine"]
+            )
+            if not machine:
+                continue
+            for item in machine.cost:
+                cost[item.item] += round(item.quantity * machine_plan_entry["count"], 2)
+        return cost
 
-                    expanded_edges.append(Edge(
-                        source=producer_id,
-                        target=consumer_id,
-                        label=f"{flow:.2f}/min"
-                    ))
+    async def compute_factory_source(self, targets):
+        demand = await self.planProduction(targets)
+        return [
+            CostEntry(item=item, quantity=round(rate, 2))
+            for item, rate in demand.items()
+            if await self.item_repo.is_source(item)
+        ]
 
-                    # Update maps and producer tuple
-                    supply_map[producer_id][item] -= flow
-                    demand_map[consumer_id][item] -= flow
-                    producers[producer_idx] = (producer_id, supply_map[producer_id][item])
-                    needed -= flow
 
-        return FactoryGraph(nodes=expanded_nodes, edges=expanded_edges)
+def to_public_node(internal: InnerNode) -> Node:
+    return Node(
+        id=internal.id,
+        label=f"{internal.machine} ({internal.primary_output})\n{internal.count:.2f}x",
+        type=internal.type,
+        rate=internal.outputs[internal.primary_output],
+        item=internal.primary_output,
+        machine=internal.machine,
+        count=internal.count,
+    )

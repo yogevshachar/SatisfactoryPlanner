@@ -1,20 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import type {DemandEntry, PlannerTarget} from "../types/factory.types.ts";
-import { API_ENDPOINTS } from "../config/api";
+import { postDemandPlan } from "../api/plannerApi";
+import { usePlannerOptions } from "../stores/plannerOptions";
 
-type DemandParams = {
-  targets: PlannerTarget[];
-};
 
-export const useDemand = (params: DemandParams, enabled: boolean = true) => {
-  return useQuery<DemandEntry[]>({
-    queryKey: ["demand", params],
-    queryFn: async () => {
-      const res = await axios.post(API_ENDPOINTS.PLANNER_DEMAND, params);
+export const useDemand = () => {
+  const store = usePlannerOptions();
+  const options = store.options;
 
-      return res.data;
-    },
-    enabled
+  return useQuery({
+    queryKey: ["demand", options],
+    enabled: !!options?.selectedItems && options.selectedItems.length > 0,
+    queryFn: () =>
+      postDemandPlan(options),
   });
 };
