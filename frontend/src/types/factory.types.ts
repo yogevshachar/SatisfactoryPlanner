@@ -5,17 +5,25 @@ export type Item = {
     stack_size: number;
     sink_value: number;
     unlocked_by_tier: number;
+    is_source?: boolean;
 };
 
 export type PlannerPayload = {
     targets: { item: string; rate: number }[];
     tier: number;
     realistic: boolean;
+    powerShards: number;
+};
+
+export type CostEntry = {
+    item: string;
+    quantity: number;
+    icon?: string;
 };
 
 export type DemandEntry = {
     item: string;
-    rate: number;
+    quantity: number;
 };
 export type MachineNode = {
     id: string;

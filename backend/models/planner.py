@@ -10,10 +10,10 @@ class DemandEntry(BaseModel):
     rate: float
 
 
-
 class FactoryGraph(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
+
 
 class MachinePlanEntry(BaseModel):
     item: str

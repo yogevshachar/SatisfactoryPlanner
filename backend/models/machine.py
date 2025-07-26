@@ -1,17 +1,21 @@
 from typing import List, Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from models.base import GameEntityBase
 
+
 class CostEntry(BaseModel):
     item: str
-    amount: float
+    quantity: float
+    amount: float = Field(alias="quantity")
+
 
 class BuildingSize(BaseModel):
     x: int
     y: int
     z: int
+
 
 class Machine(GameEntityBase):
     cost: List[CostEntry]

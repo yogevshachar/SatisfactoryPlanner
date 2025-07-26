@@ -16,6 +16,10 @@ class MongoItemRepository(ItemRepository):
         cursor = self.collection.find()
         return [Item(**doc) async for doc in cursor]
 
+    async def is_source(self, item_id: str):
+        item = await self.get_item_by_id(item_id)
+        return item.is_source if item else False
+
 
 class MongoRecipeRepository(RecipeRepository):
     def __init__(self, db):
@@ -41,6 +45,3 @@ class MongoMachineRepository(MachineRepository):
     async def get_all_machines(self):
         cursor = self.collection.find()
         return [Machine(**doc) async for doc in cursor]
-
-
-

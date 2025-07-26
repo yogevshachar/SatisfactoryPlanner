@@ -1,27 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import type {PlannerTarget} from "../types/factory.types.ts";
-import { API_ENDPOINTS } from "../config/api";
+import { postFactoryCost } from "../api/plannerApi";
+import { usePlannerOptions } from "../stores/plannerOptions";
 
-type MachinePlanEntry = {
-  item: string;
-  machine: string;
-  count: number;
-  rate: number;
-};
 
-type MachinePlanParams = {
-  targets: PlannerTarget[];
-  tier: number;
-};
 
-export const useMachinePlan = (params: MachinePlanParams, enabled: boolean = true) => {
-  return useQuery<MachinePlanEntry[]>({
-    queryKey: ["machine-plan", params],
-    queryFn: async () => {
-      const res = await axios.post(API_ENDPOINTS.PLANNER_MACHINE_PLAN, params);
-      return res.data;
-    },
-    enabled
+export const useMachinePlan = () => {
+  const store = usePlannerOptions();
+  const options = store.options;
+
+  return useQuery({
+    queryKey: ["machine-plan", options],
+    enabled: !!options?.selectedItems && options.selectedItems.length > 0,
+    queryFn: () =>
+      postFactoryCost(options),
   });
 };
